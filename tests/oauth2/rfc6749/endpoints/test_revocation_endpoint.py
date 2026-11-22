@@ -10,10 +10,20 @@ from tests.unittest import TestCase
 
 class RevocationEndpointTest(TestCase):
 
+    def set_client(self, request):
+        request.client = MagicMock()
+        request.client.client_id = 'mocked'
+        return True
+
+    def set_client_id(self, client_id, request):
+        request.client = MagicMock()
+        request.client.client_id = 'mocked'
+        return True
+
     def setUp(self):
         self.validator = MagicMock(wraps=RequestValidator())
         self.validator.client_authentication_required.return_value = True
-        self.validator.authenticate_client.return_value = True
+        self.validator.authenticate_client.side_effect = self.set_client
         self.validator.revoke_token.return_value = True
         self.endpoint = RevocationEndpoint(self.validator)
 
@@ -46,6 +56,7 @@ class RevocationEndpointTest(TestCase):
         self.assertEqual(s, 200)
 
     def test_revoke_token_client_authentication_failed(self):
+        self.validator.authenticate_client.side_effect = None
         self.validator.authenticate_client.return_value = False
         body = urlencode([('token', 'foo'),
                           ('token_type_hint', 'access_token')])
@@ -62,7 +73,7 @@ class RevocationEndpointTest(TestCase):
 
     def test_revoke_token_public_client_authentication(self):
         self.validator.client_authentication_required.return_value = False
-        self.validator.authenticate_client_id.return_value = True
+        self.validator.authenticate_client_id.side_effect = self.set_client_id
         for token_type in ('access_token', 'refresh_token', 'invalid'):
             body = urlencode([('token', 'foo'),
                               ('token_type_hint', token_type)])

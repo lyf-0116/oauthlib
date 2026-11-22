@@ -65,6 +65,17 @@ class BaseEndpoint:
             log.debug('Client authentication failed, %r.', request)
             raise InvalidClientError(request=request)
 
+        if request.client is None or \
+            not hasattr(request.client, 'client_id'):
+            raise NotImplementedError('Authenticate client must set the '
+                                      'request.client.client_id attribute '
+                                      'in authenticate_client.')
+
+        if not request.client_id:
+            request.client_id = request.client.client_id
+        elif request.client_id != request.client.client_id:
+            raise ServerError('Discrepency found between client identifier')
+
     def _raise_on_unsupported_token(self, request):
         """Raise on unsupported tokens."""
         if (request.token_type_hint and
