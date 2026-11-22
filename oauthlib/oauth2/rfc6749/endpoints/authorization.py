@@ -114,6 +114,10 @@ class AuthorizationEndpoint(BaseEndpoint):
         request.user = None     # TODO: explain this in docs
         for k, v in (credentials or {}).items():
             setattr(request, k, v)
+        # RFC 6749 section 3.1: parameters MUST NOT be included more than
+        # once. This is a fatal error because the redirect_uri itself may be
+        # duplicated, so the response must never be redirected.
+        self._raise_fatal_on_duplicate_params(request)
         self._canonicalize_response_type(request)
         response_type_handler = self.response_types.get(
             request.response_type, self.default_response_type_handler)
@@ -131,6 +135,8 @@ class AuthorizationEndpoint(BaseEndpoint):
 
         request.scopes = utils.scope_to_list(request.scope)
 
+        # See create_authorization_response: duplicated parameters are fatal.
+        self._raise_fatal_on_duplicate_params(request)
         self._canonicalize_response_type(request)
         response_type_handler = self.response_types.get(
             request.response_type, self.default_response_type_handler)

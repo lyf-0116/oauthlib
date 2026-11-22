@@ -145,3 +145,14 @@ class RevocationEndpointTest(TestCase):
         self.assertEqual(loads(b)['error'], 'unsupported_content_type')
         self.assertIn('application/x-www-form-urlencoded', loads(b)['error_description'])
         self.assertEqual(s, 400)
+
+    def test_revoke_duplicate_params(self):
+        body = urlencode([('token', 'foo'), ('token', 'bar')])
+        h, b, s = self.endpoint.create_revocation_response(
+            self.uri, headers=self.headers, body=body)
+        self.assertEqual(h, self.resp_h)
+        self.assertEqual(loads(b)['error'], 'invalid_request')
+        self.assertEqual(loads(b)['error_description'],
+                         'Duplicate token parameter.')
+        self.assertEqual(s, 400)
+        self.validator.revoke_token.assert_not_called()

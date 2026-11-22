@@ -4,6 +4,17 @@ Changelog
 Unreleased:
 ------------------
 OAuth2.0 Provider:
+* **Breaking**: Repeated request parameters are now rejected on every
+  endpoint instead of only the parameter names each grant type listed.
+  Per RFC 6749 section 3.1 a parameter MUST NOT occur more than once; a
+  repeated parameter collapses to a single parsed value, so a party able to
+  influence both occurrences could make the validated value differ from the
+  one that is used. The authorization and device authorization endpoints
+  raise a fatal ``InvalidRequestFatalError`` and never redirect, while the
+  token, introspection and revocation endpoints return a JSON
+  ``invalid_request`` response. The refresh token grant, the authorization
+  ``code`` parameter, and the introspection and revocation endpoints
+  previously had no duplicate check at all.
 * **Breaking**: #988: PKCE parameters are now validated against RFC 7636
   syntax. ``code_verifier`` must be 43-128 unreserved ASCII characters
   (``[A-Za-z0-9-._~]``) at the token endpoint (rejected with ``invalid_grant``)

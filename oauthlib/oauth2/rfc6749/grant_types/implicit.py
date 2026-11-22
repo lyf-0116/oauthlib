@@ -293,14 +293,9 @@ class ImplicitGrant(GrantTypeBase):
         # error and MUST NOT automatically redirect the user-agent to the
         # invalid redirection URI.
 
-        # First check duplicate parameters
-        for param in ('client_id', 'response_type', 'response_mode', 'redirect_uri', 'scope', 'state'):
-            try:
-                duplicate_params = request.duplicate_params
-            except ValueError:
-                raise errors.InvalidRequestFatalError(description='Unable to parse query string', request=request)
-            if param in duplicate_params:
-                raise errors.InvalidRequestFatalError(description='Duplicate %s parameter.' % param, request=request)
+        # First check duplicate parameters. Any repeated parameter is fatal;
+        # the endpoint layer performs the same check before dispatching here.
+        self._raise_fatal_on_duplicate_params(request)
 
         # REQUIRED. The client identifier as described in Section 2.2.
         # https://tools.ietf.org/html/rfc6749#section-2.2

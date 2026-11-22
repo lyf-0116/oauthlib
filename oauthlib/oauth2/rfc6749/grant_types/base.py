@@ -323,6 +323,41 @@ class GrantTypeBase:
             'Pragma': 'no-cache',
         }
 
+    def _raise_on_duplicate_params(self, request):
+        """Reject requests containing any parameter more than once.
+
+        RFC 6749 section 3.1 requires that request and response parameters
+        MUST NOT be included more than once. A request with repeated
+        parameters parses to a single value, so a party able to influence both
+        occurrences could make the validated value differ from the one that
+        is actually used. Checking every parameter here, instead of a
+        per-grant parameter list, closes that gap for every grant type.
+        """
+        for param in request.duplicate_params:
+            raise errors.InvalidRequestError(
+                request=request,
+                description='Duplicate %s parameter.' % param)
+
+    def _raise_fatal_on_duplicate_params(self, request):
+        """Fatal variant for authorization-side validation.
+
+        Duplicated parameters on an authorization request must fail
+        directly instead of being redirected back, since the redirect_uri
+        may itself be duplicated. Mirrors
+        :meth:`_raise_on_duplicate_params` but raises a fatal error and
+        treats an unparseable query string as a malformed request.
+        """
+        try:
+            duplicate_params = request.duplicate_params
+        except ValueError:
+            raise errors.InvalidRequestFatalError(
+                request=request,
+                description='Unable to parse query string')
+        for param in duplicate_params:
+            raise errors.InvalidRequestFatalError(
+                request=request,
+                description='Duplicate %s parameter.' % param)
+
     def _handle_redirects(self, request):
         if request.redirect_uri is not None:
             request.using_default_redirect_uri = False

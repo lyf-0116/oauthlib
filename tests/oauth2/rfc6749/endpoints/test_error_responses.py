@@ -147,6 +147,19 @@ class ErrorResponseTest(TestCase):
                     body=body)
             self.assertEqual('invalid_request', json.loads(body)['error'])
 
+        # Authorization code grant: the code itself must not be duplicated.
+        invalid_bodies = [
+            'grant_type=authorization_code&code=foo&code=bar',
+            # Refresh token grant previously had no duplicate check and the
+            # last value silently overrode the previous one.
+            'grant_type=refresh_token&refresh_token=foo&refresh_token=bar',
+        ]
+        for body in invalid_bodies:
+            _, body, _ = self.web.create_token_response(token_uri,
+                    body=body)
+            self.assertEqual('invalid_request', json.loads(body)['error'])
+        self.validator.save_token.assert_not_called()
+
         # Password credentials grant
         invalid_bodies = [
             # duplicate params
@@ -213,6 +226,25 @@ class ErrorResponseTest(TestCase):
                               description,
                               self.mobile.create_authorization_response,
                               uri.format('token'), scopes=['foo'])
+
+    def test_invalid_request_duplicate_any_auth_parameter(self):
+        # Every parameter, not just the historically listed ones, must be
+        # rejected at the authorization endpoint with a fatal error so the
+        # user-agent is never redirected.
+        self.validator.get_default_redirect_uri.return_value = 'https://i.b/cb'
+        for param in ('client_id', 'response_type', 'redirect_uri', 'scope',
+                      'state', 'nonce', 'code_challenge'):
+            uri = (
+                'https://i.b/auth?response_type=code&client_id=foo'
+                '&{0}=one&{0}=two'.format(param)
+            )
+            description = 'Duplicate %s parameter.' % param
+            self.assertRaisesRegex(
+                errors.InvalidRequestFatalError, description,
+                self.web.validate_authorization_request, uri)
+            self.assertRaisesRegex(
+                errors.InvalidRequestFatalError, description,
+                self.web.create_authorization_response, uri, scopes=['foo'])
 
     def test_unsupported_response_mode(self):
         self.validator.get_default_redirect_uri.return_value = 'https://i.b/cb'

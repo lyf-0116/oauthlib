@@ -10,7 +10,8 @@ import logging
 
 from ..errors import (
     FatalClientError, InvalidClientError, InvalidRequestError, OAuth2Error,
-    ServerError, TemporarilyUnavailableError, UnsupportedTokenTypeError, UnsupportedContentTypeError,
+    InvalidRequestFatalError, ServerError, TemporarilyUnavailableError,
+    UnsupportedTokenTypeError, UnsupportedContentTypeError,
 )
 
 log = logging.getLogger(__name__)
@@ -107,6 +108,49 @@ class BaseEndpoint:
                 request=request,
                 description=f"Invalid Content-Type. Must be: {allowed_type}"
             )
+
+    def _raise_on_duplicate_params(self, request):
+        """Raise on any parameter appearing more than once.
+
+        RFC 6749 Section 3.1 requires that request and response parameters
+        MUST NOT be included more than once. Parsing a request with repeated
+        parameters leaves a single value in the request object, so a party
+        able to influence both occurrences could make the value that is
+        validated differ from the one that is actually used. Rejecting the
+        whole request removes that ambiguity.
+
+        Token-style endpoints report this as a regular ``invalid_request``
+        error, which is rendered as a JSON response.
+        """
+        try:
+            duplicate_params = request.duplicate_params
+        except ValueError:
+            raise InvalidRequestError(
+                request=request,
+                description='Unable to parse query string')
+        for param in duplicate_params:
+            raise InvalidRequestError(
+                request=request,
+                description='Duplicate %s parameter.' % param)
+
+    def _raise_fatal_on_duplicate_params(self, request):
+        """Raise a fatal error on any duplicated parameter.
+
+        Variant of :meth:`_raise_on_duplicate_params` for the authorization
+        endpoint, where the request must fail directly instead of being
+        redirected back to the client: the redirect URI itself is one of the
+        parameters that can be repeated.
+        """
+        try:
+            duplicate_params = request.duplicate_params
+        except ValueError:
+            raise InvalidRequestFatalError(
+                request=request,
+                description='Unable to parse query string')
+        for param in duplicate_params:
+            raise InvalidRequestFatalError(
+                request=request,
+                description='Duplicate %s parameter.' % param)
 
 def catch_errors_and_unavailability(f):
     @functools.wraps(f)

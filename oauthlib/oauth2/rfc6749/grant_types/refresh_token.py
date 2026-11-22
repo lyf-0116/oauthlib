@@ -90,6 +90,8 @@ class RefreshTokenGrant(GrantTypeBase):
                 description='Missing refresh token parameter.',
                 request=request)
 
+        self._raise_on_duplicate_params(request)
+
         # Because refresh tokens are typically long-lasting credentials used to
         # request additional access tokens, the refresh token is bound to the
         # client to which it was issued

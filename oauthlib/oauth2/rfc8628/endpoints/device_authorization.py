@@ -107,6 +107,10 @@ class DeviceAuthorizationEndpoint(BaseEndpoint):
             request,
             allowed_type='application/x-www-form-urlencoded',
         )
+        # RFC 6749 section 3.1: parameters MUST NOT be included more than
+        # once. Check every parameter centrally rather than relying on the
+        # grant type's parameter list. Fatal like the grant-level check.
+        self._raise_fatal_on_duplicate_params(request)
         self.device_code_grant.validate_device_authorization_request(request)
 
     @catch_errors_and_unavailability

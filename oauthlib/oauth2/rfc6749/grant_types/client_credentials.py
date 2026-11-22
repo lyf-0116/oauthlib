@@ -99,10 +99,7 @@ class ClientCredentialsGrant(GrantTypeBase):
         if not request.grant_type == 'client_credentials':
             raise errors.UnsupportedGrantTypeError(request=request)
 
-        for param in ('grant_type', 'scope'):
-            if param in request.duplicate_params:
-                raise errors.InvalidRequestError(description='Duplicate %s parameter.' % param,
-                                                 request=request)
+        self._raise_on_duplicate_params(request)
 
         self.validate_client_confidential(request)
 

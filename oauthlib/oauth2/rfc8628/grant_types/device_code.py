@@ -71,18 +71,9 @@ class DeviceCodeGrant(GrantTypeBase):
         .. _`Section 3.2.1. of [RFC6749]`: https://www.rfc-editor.org/rfc/rfc6749#section-3.2.1
         .. _`Section 2.2 of [RFC6749]`: https://www.rfc-editor.org/rfc/rfc6749#section-2.2
         """
-        # First check duplicate parameters
-        for param in ("client_id", "scope"):
-            try:
-                duplicate_params = request.duplicate_params
-            except ValueError:
-                raise rfc6749_errors.InvalidRequestFatalError(
-                    description="Unable to parse query string", request=request
-                )
-            if param in duplicate_params:
-                raise rfc6749_errors.InvalidRequestFatalError(
-                    description="Duplicate %s parameter." % param, request=request
-                )
+        # First check duplicate parameters. Any repeated parameter is fatal;
+        # the endpoint layer performs the same check before dispatching here.
+        self._raise_fatal_on_duplicate_params(request)
 
         # REQUIRED. The client identifier as described in Section 2.2.
         # https://tools.ietf.org/html/rfc6749#section-2.2
@@ -120,11 +111,7 @@ class DeviceCodeGrant(GrantTypeBase):
         if request.grant_type != "urn:ietf:params:oauth:grant-type:device_code":
             raise rfc6749_errors.UnsupportedGrantTypeError(request=request)
 
-        for param in ("grant_type", "scope"):
-            if param in request.duplicate_params:
-                raise rfc6749_errors.InvalidRequestError(
-                    description=f"Duplicate {param} parameter.", request=request
-                )
+        self._raise_on_duplicate_params(request)
 
         self.validate_client_authentication(request)
 
