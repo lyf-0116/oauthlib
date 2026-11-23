@@ -6,9 +6,13 @@ oauthlib.oauth1.rfc5849.endpoints.base
 This module is an implementation of various logic needed
 for signing and checking OAuth 1.0 RFC 5849 requests.
 """
+import base64
+import hashlib
 import time
 
-from oauthlib.common import CaseInsensitiveDict, Request, generate_token
+from oauthlib.common import (
+    CaseInsensitiveDict, Request, generate_token, safe_string_equals,
+)
 
 from .. import (
     CONTENT_TYPE_FORM_URLENCODED, SIGNATURE_HMAC_SHA1, SIGNATURE_HMAC_SHA256,
@@ -32,8 +36,16 @@ class BaseEndpoint:
         # optional parameter.
         header_params = signature.collect_parameters(headers=request.headers,
                                                      exclude_oauth_signature=False, with_realm=True)
-        body_params = signature.collect_parameters(body=request.body,
-                                                   exclude_oauth_signature=False)
+        # Per RFC 5849 section 3.4.1.3.1, the entity-body is only a
+        # parameter source when the Content-Type is
+        # x-www-form-urlencoded. Other bodies (e.g. JSON) are opaque
+        # payload and must not be parsed for oauth_ parameters.
+        content_type = request.headers.get('Content-Type', '')
+        if CONTENT_TYPE_FORM_URLENCODED in content_type:  # noqa: SIM108
+            body_params = signature.collect_parameters(body=request.body,
+                                                       exclude_oauth_signature=False)
+        else:
+            body_params = []
         query_params = signature.collect_parameters(uri_query=request.uri_query,
                                                     exclude_oauth_signature=False)
 
@@ -67,12 +79,11 @@ class BaseEndpoint:
         return signature_type, params, oauth_params
 
     def _create_request(self, uri, http_method, body, headers):
-        # Only include body data from x-www-form-urlencoded requests
+        # Keep the raw body for all requests. Non form-encoded bodies are
+        # protected by the oauth_body_hash parameter and the actual bytes
+        # are needed to verify it.
         headers = CaseInsensitiveDict(headers or {})
-        if "Content-Type" in headers and CONTENT_TYPE_FORM_URLENCODED in headers["Content-Type"]:  # noqa: SIM108
-            request = Request(uri, http_method, body, headers)
-        else:
-            request = Request(uri, http_method, '', headers)
+        request = Request(uri, http_method, body, headers)
         _signature_type, params, oauth_params = (
             self._get_signature_type_and_params(request))
 
@@ -176,6 +187,18 @@ class BaseEndpoint:
                 description='Invalid nonce format.')
 
     def _check_signature(self, request, is_token_request=False):
+        # The oauth_body_hash parameter, when present, binds the signature
+        # to the request body. Recompute it from the actual body bytes so
+        # that a swapped body invalidates the signed request.
+        body_hash = request.oauth_params.get('oauth_body_hash')
+        if body_hash is not None:
+            body = request.body or ''
+            if isinstance(body, str):
+                body = body.encode('utf-8')
+            digest = base64.b64encode(hashlib.sha1(body).digest()).decode('utf-8')  # noqa: S324
+            if not safe_string_equals(body_hash, digest):
+                return False
+
         # ---- RSA Signature verification ----
         if request.signature_method in {SIGNATURE_RSA_SHA1, SIGNATURE_RSA_SHA256, SIGNATURE_RSA_SHA512}:
             # RSA-based signature method
