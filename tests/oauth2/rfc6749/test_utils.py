@@ -96,6 +96,12 @@ class UtilsTests(TestCase):
         string_scopes = 'foo bar baz '
         self.assertEqual(scope_to_list(string_scopes), expected)
 
+        multi_space_scopes = 'foo  bar   baz'
+        self.assertEqual(scope_to_list(multi_space_scopes), expected)
+
+        list_with_blanks = ['foo', '', '  ', 'bar', 'baz']
+        self.assertEqual(scope_to_list(list_with_blanks), expected)
+
         string_list_scopes = ['foo', 'bar', 'baz']
         self.assertEqual(scope_to_list(string_list_scopes), expected)
 

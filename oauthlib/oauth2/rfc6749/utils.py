@@ -16,7 +16,7 @@ def list_to_scope(scope):
     if isinstance(scope, str) or scope is None:
         return scope
     elif isinstance(scope, (set, tuple, list)):
-        return " ".join([str(s) for s in scope])
+        return " ".join([str(s).strip() for s in scope if str(s).strip()])
     else:
         raise ValueError("Invalid scope (%s), must be string, tuple, set, or list." % scope)
 
@@ -24,11 +24,11 @@ def list_to_scope(scope):
 def scope_to_list(scope):
     """Convert a space separated string to a list of scopes."""
     if isinstance(scope, (tuple, list, set)):
-        return [str(s) for s in scope]
+        return [s for s in (str(item).strip() for item in scope) if s]
     elif scope is None:
         return None
     else:
-        return scope.strip().split(" ")
+        return scope.split()
 
 
 def params_from_uri(uri):
